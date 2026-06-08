@@ -1,0 +1,16 @@
+# Claude Code
+.claude/
+
+# Secrets
+.env
+
+# Generated briefings
+briefings/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.ipynb_checkpoints/

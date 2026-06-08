@@ -1,0 +1,52 @@
+flowchart TD
+    START([START]):::se
+
+    subgraph RES["Investigación · en paralelo"]
+        direction LR
+        research["research_node<br/><i>qué hacen · noticias</i>"]
+        tech["tech_stack_node<br/><i>stack · frameworks</i>"]
+    end
+
+    subgraph QST["Preguntas"]
+        direction LR
+        genq["generate_questions_node<br/><i>genera / edita</i>"]
+        revq{{"review_questions_node<br/>interrupt() · pausa"}}
+    end
+
+    subgraph BRF["Briefing"]
+        direction LR
+        genb["generate_briefing_node<br/><i>genera / edita</i>"]
+        revb{{"review_briefing_node<br/>interrupt() · pausa"}}
+    end
+
+    write["write_file_node<br/><i>guarda el .md</i>"]
+    DONE([END]):::se
+
+    %% --- Camino principal ---
+    START --> research
+    START --> tech
+    research --> genq
+    tech --> genq
+    genq --> revq
+    revq -- "ok" --> genb
+    genb --> revb
+    revb -- "ok" --> write
+    write --> DONE
+
+    %% --- Bucles de edición (mismo dato, solo reescribe) ---
+    revq -. "editar" .-> genq
+    revb -. "editar" .-> genb
+
+    %% --- Re-búsqueda (feedback que necesita datos nuevos) ---
+    revq -. "re-buscar" .-> research
+    revq -. "re-buscar" .-> tech
+    revb -. "re-buscar" .-> research
+    revb -. "re-buscar" .-> tech
+    research -. "vuelve" .-> genb
+    tech -. "vuelve" .-> genb
+
+    classDef se fill:#bfb6fc,stroke:#6c5ce7,color:#111,font-weight:bold;
+    classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;
+    style RES fill:#eef7ff,stroke:#7fb3ff
+    style QST fill:#fff6ed,stroke:#ffb870
+    style BRF fill:#eefcf0,stroke:#86d99a
