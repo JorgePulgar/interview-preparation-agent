@@ -34,12 +34,6 @@ En cada pausa puedes:
 
 ![Grafo del agente](graph.png)
 
-> Diagrama hecho a mano en [`graph.drawio`](graph.drawio) (coordenadas fijas, para
-> que el ciclo de re-búsqueda quede legible con `START` arriba). Ábrelo y edítalo con
-> [draw.io](https://app.diagrams.net), la app de escritorio, o la extensión *Draw.io
-> Integration* de VSCode; `graph.png` es su exportación. **No se autogenera** desde el
-> código: si cambias el grafo, actualízalo a mano.
-
 ### Cómo funciona por dentro (resumen sencillo)
 
 Hay un **grafo padre** (el agente principal). Dentro de él, tres de sus "nodos"
@@ -176,14 +170,6 @@ python interview_agent.py "Stripe"
 Si no pasas nombre, usa `Stripe` por defecto. El agente se pausará por consola;
 responde `ok` o escribe qué cambiar. Al terminar verás la ruta del `.md` generado
 en `briefings/`.
-
----
-
-## Visualizar el grafo
-
-Abre [`graph.drawio`](graph.drawio) con [draw.io](https://app.diagrams.net), la app
-de escritorio o la extensión *Draw.io Integration* de VSCode. Para refrescar la
-imagen, expórtalo a `graph.png` (en draw.io: *File → Export as → PNG*).
 
 ---
 
