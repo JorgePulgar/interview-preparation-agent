@@ -32,103 +32,13 @@ En cada pausa puedes:
 
 ## Arquitectura del grafo
 
-```mermaid
-flowchart TD
-    START([START]):::se
+![Grafo del agente](graph.png)
 
-    subgraph RES["research · sub-grafo (map-reduce)"]
-        direction TB
-        rfan["fan-out · 1 Send por query"]:::map
-        rw1["search_one"]
-        rw2["search_one"]
-        rw3["search_one"]
-        rsyn["synthesize · resume noticias"]:::map
-        rfan --> rw1 & rw2 & rw3 --> rsyn
-    end
-
-    subgraph TEC["tech_stack · sub-grafo (map-reduce)"]
-        direction TB
-        tfan["fan-out · 1 Send por query"]:::map
-        tw1["search_one"]
-        tw2["search_one"]
-        tw3["search_one"]
-        tsyn["synthesize · extrae el stack"]:::map
-        tfan --> tw1 & tw2 & tw3 --> tsyn
-    end
-
-    subgraph QST["Preguntas · grafo padre"]
-        direction TB
-        genq["generate_questions_node<br/><i>genera / edita</i>"]
-        revq{{"review_questions_node<br/>interrupt() · pausa"}}
-        genq --> revq
-        revq -. "editar" .-> genq
-    end
-
-    subgraph BRF["briefing · sub-grafo"]
-        direction TB
-        genb["generate_briefing<br/><i>genera / edita</i>"]
-        revb{{"review_briefing<br/>interrupt() · pausa"}}
-        genb --> revb
-        revb -. "editar (bucle interno)" .-> genb
-    end
-
-    write["write_file_node<br/><i>guarda el .md</i>"]
-    DONE([END]):::se
-
-    START --> RES
-    START --> TEC
-    RES --> QST
-    TEC --> QST
-    QST -- "ok" --> BRF
-    BRF -- "ok" --> write
-    write --> DONE
-
-    classDef se fill:#bfb6fc,stroke:#6c5ce7,color:#111,font-weight:bold;
-    classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;
-    classDef map fill:#ffe9c7,stroke:#f0a23b,color:#111;
-    style RES fill:#eef7ff,stroke:#7fb3ff
-    style TEC fill:#eef7ff,stroke:#7fb3ff
-    style QST fill:#fff6ed,stroke:#ffb870
-    style BRF fill:#eefcf0,stroke:#86d99a
-```
-
-El diagrama de arriba muestra el **camino principal** (la espina vertical) y, dentro
-de cada caja, sus detalles: el map-reduce de búsqueda y el bucle interno de
-**edición** (`editar`).
-
-Aparte, los **bucles de feedback** que ocurren cuando NO respondes `ok` en una
-revisión van en este segundo diagrama (se separan porque, dibujados sobre la espina
-vertical, descuadran el layout):
-
-```mermaid
-flowchart LR
-    rev{{"Revisión<br/>(preguntas o briefing)<br/>interrupt() · pausa"}}:::rev
-    gen["Generar de nuevo<br/>la MISMA fase"]
-    search["research / tech_stack<br/>(volver a BUSCAR datos)"]:::map
-
-    rev -. "editar<br/>(retoque de redacción)" .-> gen
-    rev -. "re-buscar<br/>(pides datos nuevos)" .-> search
-    search -. "vuelve a la fase<br/>que pidió la búsqueda" .-> gen
-    gen -- "muestra el<br/>resultado nuevo" --> rev
-
-    classDef rev fill:#ede7ff,stroke:#7c5cff,color:#111;
-    classDef map fill:#ffe9c7,stroke:#f0a23b,color:#111;
-    classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;
-```
-
-> GitHub renderiza los bloques `mermaid` de forma interactiva. También se generan
-> `graph.png` (camino principal) y `graph-loops.png` (bucles de feedback) con
-> `python show_graph.py`, por si los prefieres como imagen.
-
-**¿Y todo en UN solo diagrama?** Los bucles de re-búsqueda apuntan *hacia arriba*
-(de una revisión de vuelta a `research`/`tech_stack`), o sea forman ciclos. Los
-motores de auto-layout de Mermaid (dagre/ELK) no pueden dibujar un ciclo como un
-árbol limpio de arriba-abajo: o descuadran las cajas, o bajan `START` del tope. Por
-eso arriba se separan en dos diagramas. Si quieres **todo junto con START arriba y
-las flechas de vuelta**, hay un diagrama hecho a mano (coordenadas fijas) en
-[`graph.drawio`](graph.drawio): ábrelo con [draw.io](https://app.diagrams.net),
-la app de escritorio o la extensión *Draw.io Integration* de VSCode. Es editable
-pero **no se autogenera** desde el código (hay que mantenerlo a mano).
+> Diagrama hecho a mano en [`graph.drawio`](graph.drawio) (coordenadas fijas, para
+> que el ciclo de re-búsqueda quede legible con `START` arriba). Ábrelo y edítalo con
+> [draw.io](https://app.diagrams.net), la app de escritorio, o la extensión *Draw.io
+> Integration* de VSCode; `graph.png` es su exportación. **No se autogenera** desde el
+> código: si cambias el grafo, actualízalo a mano.
 
 ### Cómo funciona por dentro (resumen sencillo)
 
@@ -177,9 +87,6 @@ Cuatro ideas clave del diseño:
 **Dos niveles de paralelismo:** (A) `research` ‖ `tech_stack` como hermanos desde
 `START`; (B) dentro de cada uno, sus 3 `search_one` a la vez. `briefing` no tiene
 paralelismo interno (es `generate → review` + bucle de edición).
-
-> El diagrama se regenera con `python show_graph.py`. Está dibujado a mano en
-> `show_graph.py` para que se lea bien; si cambias el grafo, actualiza también ese archivo.
 
 ### Comprobar que los sub-grafos y el map-reduce corren de verdad
 
@@ -274,12 +181,9 @@ en `briefings/`.
 
 ## Visualizar el grafo
 
-```powershell
-python show_graph.py
-```
-
-Genera `graph.png` (ábrelo en VSCode) y `graph.mmd` (texto Mermaid, previsualizable
-con la extensión *Markdown Preview Mermaid Support*).
+Abre [`graph.drawio`](graph.drawio) con [draw.io](https://app.diagrams.net), la app
+de escritorio o la extensión *Draw.io Integration* de VSCode. Para refrescar la
+imagen, expórtalo a `graph.png` (en draw.io: *File → Export as → PNG*).
 
 ---
 
@@ -288,13 +192,11 @@ con la extensión *Markdown Preview Mermaid Support*).
 ```
 .
 ├── interview_agent.py   # el agente (grafo padre + sub-grafos + map-reduce) — comentado en español
-├── show_graph.py        # genera el diagrama del grafo (graph.png / graph.mmd)
 ├── inspect_run.py       # ejecuta con stream(subgraphs=True) para ver sub-grafos y map-reduce
 ├── requirements.txt     # dependencias
 ├── .env.example         # plantilla de variables de entorno
-├── graph.png            # diagrama: camino principal (espina vertical)
-├── graph-loops.png      # diagrama: bucles de feedback (editar / re-buscar)
-├── graph.drawio         # diagrama hecho a mano: todo en uno (editable en draw.io)
+├── graph.drawio         # diagrama del grafo (editable en draw.io)
+├── graph.png            # imagen del diagrama (exportada de graph.drawio)
 └── briefings/           # salida: los .md generados (ignorada por git)
 ```
 
