@@ -120,6 +120,16 @@ flowchart LR
 > `graph.png` (camino principal) y `graph-loops.png` (bucles de feedback) con
 > `python show_graph.py`, por si los prefieres como imagen.
 
+**¿Y todo en UN solo diagrama?** Los bucles de re-búsqueda apuntan *hacia arriba*
+(de una revisión de vuelta a `research`/`tech_stack`), o sea forman ciclos. Los
+motores de auto-layout de Mermaid (dagre/ELK) no pueden dibujar un ciclo como un
+árbol limpio de arriba-abajo: o descuadran las cajas, o bajan `START` del tope. Por
+eso arriba se separan en dos diagramas. Si quieres **todo junto con START arriba y
+las flechas de vuelta**, hay un diagrama hecho a mano (coordenadas fijas) en
+[`graph.drawio`](graph.drawio): ábrelo con [draw.io](https://app.diagrams.net),
+la app de escritorio o la extensión *Draw.io Integration* de VSCode. Es editable
+pero **no se autogenera** desde el código (hay que mantenerlo a mano).
+
 ### Cómo funciona por dentro (resumen sencillo)
 
 Hay un **grafo padre** (el agente principal). Dentro de él, tres de sus "nodos"
@@ -284,6 +294,7 @@ con la extensión *Markdown Preview Mermaid Support*).
 ├── .env.example         # plantilla de variables de entorno
 ├── graph.png            # diagrama: camino principal (espina vertical)
 ├── graph-loops.png      # diagrama: bucles de feedback (editar / re-buscar)
+├── graph.drawio         # diagrama hecho a mano: todo en uno (editable en draw.io)
 └── briefings/           # salida: los .md generados (ignorada por git)
 ```
 
