@@ -25,44 +25,37 @@ from langchain_core.runnables.graph_mermaid import draw_mermaid_png
 MERMAID = """flowchart TD
     START([START]):::se
 
-    subgraph RES["SUB-GRAFO research · map-reduce"]
+    %% --- Fila de investigación: dos sub-grafos lado a lado (izq / der) ---
+    subgraph RES["research · sub-grafo (map-reduce)"]
         direction TB
-        rfan["fan-out (MAP)<br/><i>1 Send por query</i>"]:::map
+        rfan["fan-out · 1 Send por query"]:::map
         rw1["search_one"]
         rw2["search_one"]
         rw3["search_one"]
-        rsyn["synthesize (REDUCE)<br/><i>resume noticias</i>"]:::map
-        rfan -- Send --> rw1
-        rfan -- Send --> rw2
-        rfan -- Send --> rw3
-        rw1 --> rsyn
-        rw2 --> rsyn
-        rw3 --> rsyn
+        rsyn["synthesize · resume noticias"]:::map
+        rfan --> rw1 & rw2 & rw3 --> rsyn
     end
 
-    subgraph TEC["SUB-GRAFO tech_stack · map-reduce"]
+    subgraph TEC["tech_stack · sub-grafo (map-reduce)"]
         direction TB
-        tfan["fan-out (MAP)<br/><i>1 Send por query</i>"]:::map
+        tfan["fan-out · 1 Send por query"]:::map
         tw1["search_one"]
         tw2["search_one"]
         tw3["search_one"]
-        tsyn["synthesize (REDUCE)<br/><i>extrae el stack</i>"]:::map
-        tfan -- Send --> tw1
-        tfan -- Send --> tw2
-        tfan -- Send --> tw3
-        tw1 --> tsyn
-        tw2 --> tsyn
-        tw3 --> tsyn
+        tsyn["synthesize · extrae el stack"]:::map
+        tfan --> tw1 & tw2 & tw3 --> tsyn
     end
 
-    subgraph QST["Preguntas (grafo padre)"]
-        direction LR
+    subgraph QST["Preguntas · grafo padre"]
+        direction TB
         genq["generate_questions_node<br/><i>genera / edita</i>"]
         revq{{"review_questions_node<br/>interrupt() · pausa"}}
+        genq --> revq
+        revq -. "editar" .-> genq
     end
 
-    subgraph BRF["SUB-GRAFO briefing"]
-        direction LR
+    subgraph BRF["briefing · sub-grafo"]
+        direction TB
         genb["generate_briefing<br/><i>genera / edita</i>"]
         revb{{"review_briefing<br/>interrupt() · pausa"}}
         genb --> revb
@@ -72,26 +65,22 @@ MERMAID = """flowchart TD
     write["write_file_node<br/><i>guarda el .md</i>"]
     DONE([END]):::se
 
-    %% --- Camino principal ---
+    %% --- Espina dorsal vertical (caja debajo de caja) ---
     START --> RES
     START --> TEC
-    RES --> genq
-    TEC --> genq
-    genq --> revq
-    revq -- "ok" --> BRF
+    RES --> QST
+    TEC --> QST
+    QST -- "ok" --> BRF
     BRF -- "ok" --> write
     write --> DONE
 
-    %% --- Bucle de edición de preguntas (mismo dato, solo reescribe) ---
-    revq -. "editar" .-> genq
-
     %% --- Re-búsqueda (feedback que necesita datos nuevos) ---
-    revq -. "re-buscar" .-> RES
-    revq -. "re-buscar" .-> TEC
+    QST -. "re-buscar" .-> RES
+    QST -. "re-buscar" .-> TEC
     BRF -. "re-buscar" .-> RES
     BRF -. "re-buscar" .-> TEC
-    RES -. "vuelve" .-> BRF
-    TEC -. "vuelve" .-> BRF
+    RES -. "vuelve tras re-buscar" .-> BRF
+    TEC -. "vuelve tras re-buscar" .-> BRF
 
     classDef se fill:#bfb6fc,stroke:#6c5ce7,color:#111,font-weight:bold;
     classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;

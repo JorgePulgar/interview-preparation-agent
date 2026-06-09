@@ -32,7 +32,76 @@ En cada pausa puedes:
 
 ## Arquitectura del grafo
 
-![Grafo del agente](graph.png)
+```mermaid
+flowchart TD
+    START([START]):::se
+
+    subgraph RES["research · sub-grafo (map-reduce)"]
+        direction TB
+        rfan["fan-out · 1 Send por query"]:::map
+        rw1["search_one"]
+        rw2["search_one"]
+        rw3["search_one"]
+        rsyn["synthesize · resume noticias"]:::map
+        rfan --> rw1 & rw2 & rw3 --> rsyn
+    end
+
+    subgraph TEC["tech_stack · sub-grafo (map-reduce)"]
+        direction TB
+        tfan["fan-out · 1 Send por query"]:::map
+        tw1["search_one"]
+        tw2["search_one"]
+        tw3["search_one"]
+        tsyn["synthesize · extrae el stack"]:::map
+        tfan --> tw1 & tw2 & tw3 --> tsyn
+    end
+
+    subgraph QST["Preguntas · grafo padre"]
+        direction TB
+        genq["generate_questions_node<br/><i>genera / edita</i>"]
+        revq{{"review_questions_node<br/>interrupt() · pausa"}}
+        genq --> revq
+        revq -. "editar" .-> genq
+    end
+
+    subgraph BRF["briefing · sub-grafo"]
+        direction TB
+        genb["generate_briefing<br/><i>genera / edita</i>"]
+        revb{{"review_briefing<br/>interrupt() · pausa"}}
+        genb --> revb
+        revb -. "editar (bucle interno)" .-> genb
+    end
+
+    write["write_file_node<br/><i>guarda el .md</i>"]
+    DONE([END]):::se
+
+    START --> RES
+    START --> TEC
+    RES --> QST
+    TEC --> QST
+    QST -- "ok" --> BRF
+    BRF -- "ok" --> write
+    write --> DONE
+
+    QST -. "re-buscar" .-> RES
+    QST -. "re-buscar" .-> TEC
+    BRF -. "re-buscar" .-> RES
+    BRF -. "re-buscar" .-> TEC
+    RES -. "vuelve tras re-buscar" .-> BRF
+    TEC -. "vuelve tras re-buscar" .-> BRF
+
+    classDef se fill:#bfb6fc,stroke:#6c5ce7,color:#111,font-weight:bold;
+    classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;
+    classDef map fill:#ffe9c7,stroke:#f0a23b,color:#111;
+    style RES fill:#eef7ff,stroke:#7fb3ff
+    style TEC fill:#eef7ff,stroke:#7fb3ff
+    style QST fill:#fff6ed,stroke:#ffb870
+    style BRF fill:#eefcf0,stroke:#86d99a
+```
+
+> GitHub renderiza el bloque `mermaid` de arriba de forma interactiva. También hay
+> un `graph.png` (mismo diagrama) por si lo prefieres como imagen: se genera con
+> `python show_graph.py`.
 
 ### Cómo funciona por dentro (resumen sencillo)
 
