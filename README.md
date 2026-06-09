@@ -82,9 +82,6 @@ Cuatro ideas clave del diseño:
 `START`; (B) dentro de cada uno, sus 3 `search_one` a la vez. `briefing` no tiene
 paralelismo interno (es `generate → review` + bucle de edición).
 
-> El diagrama se regenera con `python show_graph.py`. Está dibujado a mano en
-> `show_graph.py` para que se lea bien; si cambias el grafo, actualiza también ese archivo.
-
 ### Comprobar que los sub-grafos y el map-reduce corren de verdad
 
 Un run normal produce la misma salida que una versión secuencial, así que "salió un
@@ -176,27 +173,16 @@ en `briefings/`.
 
 ---
 
-## Visualizar el grafo
-
-```powershell
-python show_graph.py
-```
-
-Genera `graph.png` (ábrelo en VSCode) y `graph.mmd` (texto Mermaid, previsualizable
-con la extensión *Markdown Preview Mermaid Support*).
-
----
-
 ## Estructura del proyecto
 
 ```
 .
 ├── interview_agent.py   # el agente (grafo padre + sub-grafos + map-reduce) — comentado en español
-├── show_graph.py        # genera el diagrama del grafo (graph.png / graph.mmd)
 ├── inspect_run.py       # ejecuta con stream(subgraphs=True) para ver sub-grafos y map-reduce
 ├── requirements.txt     # dependencias
 ├── .env.example         # plantilla de variables de entorno
-├── graph.png            # diagrama del grafo
+├── graph.drawio         # diagrama del grafo (editable en draw.io)
+├── graph.png            # imagen del diagrama (exportada de graph.drawio)
 └── briefings/           # salida: los .md generados (ignorada por git)
 ```
 

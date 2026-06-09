@@ -1,0 +1,145 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="interview-agent" id="interview-agent">
+    <mxGraphModel dx="1200" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="1350" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ============ Cajas de fase (fondo, dibujadas primero) ============ -->
+        <mxCell id="gRES" value="research · sub-grafo (map-reduce)" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontSize=13;fontStyle=2;fillColor=#eef7ff;strokeColor=#7fb3ff;" vertex="1" parent="1">
+          <mxGeometry x="40" y="150" width="520" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="gTEC" value="tech_stack · sub-grafo (map-reduce)" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontSize=13;fontStyle=2;fillColor=#eef7ff;strokeColor=#7fb3ff;" vertex="1" parent="1">
+          <mxGeometry x="640" y="150" width="520" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="gQST" value="Preguntas · grafo padre" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontSize=13;fillColor=#fff6ed;strokeColor=#ffb870;" vertex="1" parent="1">
+          <mxGeometry x="430" y="540" width="340" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="gBRF" value="briefing · sub-grafo" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontSize=13;fillColor=#eefcf0;strokeColor=#86d99a;" vertex="1" parent="1">
+          <mxGeometry x="430" y="840" width="340" height="240" as="geometry" />
+        </mxCell>
+
+        <!-- ============ START / END ============ -->
+        <mxCell id="START" value="START" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#bfb6fc;strokeColor=#6c5ce7;" vertex="1" parent="1">
+          <mxGeometry x="540" y="40" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="END" value="END" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#bfb6fc;strokeColor=#6c5ce7;" vertex="1" parent="1">
+          <mxGeometry x="540" y="1220" width="120" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ============ research interno (map-reduce) ============ -->
+        <mxCell id="rfan" value="fan-out · 1 Send por query" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe9c7;strokeColor=#f0a23b;" vertex="1" parent="1">
+          <mxGeometry x="150" y="200" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="rs1" value="search_one" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="70" y="290" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="rs2" value="search_one" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="235" y="290" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="rs3" value="search_one" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="400" y="290" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="rsyn" value="synthesize · resume noticias" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe9c7;strokeColor=#f0a23b;" vertex="1" parent="1">
+          <mxGeometry x="150" y="390" width="300" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ============ tech_stack interno (map-reduce) ============ -->
+        <mxCell id="tfan" value="fan-out · 1 Send por query" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe9c7;strokeColor=#f0a23b;" vertex="1" parent="1">
+          <mxGeometry x="750" y="200" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ts1" value="search_one" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="670" y="290" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ts2" value="search_one" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="835" y="290" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ts3" value="search_one" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="290" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="tsyn" value="synthesize · extrae el stack" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe9c7;strokeColor=#f0a23b;" vertex="1" parent="1">
+          <mxGeometry x="750" y="390" width="300" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Preguntas ============ -->
+        <mxCell id="genq" value="generate_questions_node&#10;(genera / edita)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="470" y="585" width="260" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="revq" value="review_questions_node&#10;interrupt() · pausa" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#ede7ff;strokeColor=#7c5cff;" vertex="1" parent="1">
+          <mxGeometry x="470" y="680" width="260" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ============ briefing ============ -->
+        <mxCell id="genb" value="generate_briefing&#10;(genera / edita)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="470" y="885" width="260" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="revb" value="review_briefing&#10;interrupt() · pausa" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#ede7ff;strokeColor=#7c5cff;" vertex="1" parent="1">
+          <mxGeometry x="470" y="980" width="260" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="write" value="write_file_node&#10;(guarda el .md)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f0ff;strokeColor=#b9aef7;" vertex="1" parent="1">
+          <mxGeometry x="500" y="1130" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ============ map-reduce interno: fan-out -> workers -> synthesize ============ -->
+        <mxCell id="e_rf1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="rfan" target="rs1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_rf2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="rfan" target="rs2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_rf3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="rfan" target="rs3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_r1s" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="rs1" target="rsyn"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_r2s" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="rs2" target="rsyn"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_r3s" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="rs3" target="rsyn"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e_tf1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="tfan" target="ts1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_tf2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="tfan" target="ts2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_tf3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="tfan" target="ts3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_t1s" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="ts1" target="tsyn"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_t2s" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="ts2" target="tsyn"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_t3s" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#555;" edge="1" parent="1" source="ts3" target="tsyn"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ============ Espina dorsal (solido) ============ -->
+        <mxCell id="e_s_r" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;" edge="1" parent="1" source="START" target="rfan"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_s_t" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;" edge="1" parent="1" source="START" target="tfan"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_rq" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;" edge="1" parent="1" source="rsyn" target="genq"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_tq" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;" edge="1" parent="1" source="tsyn" target="genq"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_gq_rq" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;" edge="1" parent="1" source="genq" target="revq"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_q_b" value="ok" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;fontSize=12;" edge="1" parent="1" source="revq" target="genb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_gb_rb" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;" edge="1" parent="1" source="genb" target="revb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_b_w" value="ok" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;fontSize=12;" edge="1" parent="1" source="revb" target="write"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_w_e" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeColor=#333;" edge="1" parent="1" source="write" target="END"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ============ Bucles de edicion (dotted, internos) ============ -->
+        <mxCell id="e_ed_q" value="editar" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#7c5cff;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="revq" target="genq">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="755" y="707" /><mxPoint x="755" y="612" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_ed_b" value="editar (bucle interno)" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#7c5cff;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="revb" target="genb">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="755" y="1007" /><mxPoint x="755" y="912" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ============ Re-buscar desde Preguntas (corto, hacia las cajas de arriba) ============ -->
+        <mxCell id="e_rbq_r" value="re-buscar" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#888;fontSize=11;exitX=0.25;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="revq" target="rsyn">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="535" y="510" /><mxPoint x="300" y="510" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_rbq_t" value="re-buscar" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#888;fontSize=11;exitX=0.75;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="revq" target="tsyn">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="665" y="510" /><mxPoint x="900" y="510" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ============ Re-buscar desde briefing (largo, por los margenes exteriores) ============ -->
+        <mxCell id="e_rbb_r" value="re-buscar" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#888;fontSize=11;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="revb" target="gRES">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="20" y="1007" /><mxPoint x="20" y="310" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_rbb_t" value="re-buscar" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#888;fontSize=11;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="revb" target="gTEC">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1180" y="1007" /><mxPoint x="1180" y="310" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ============ Vuelve tras re-buscar: research/tech -> briefing (lanes junto a la espina) ============ -->
+        <mxCell id="e_vr_b" value="vuelve" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#aaa;fontSize=11;exitX=0.5;exitY=1;entryX=0;entryY=0.4;" edge="1" parent="1" source="rsyn" target="genb">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="300" y="470" /><mxPoint x="415" y="470" /><mxPoint x="415" y="907" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_vt_b" value="vuelve" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;dashed=1;strokeColor=#aaa;fontSize=11;exitX=0.5;exitY=1;entryX=1;entryY=0.4;" edge="1" parent="1" source="tsyn" target="genb">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="900" y="470" /><mxPoint x="785" y="470" /><mxPoint x="785" y="907" /></Array></mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
