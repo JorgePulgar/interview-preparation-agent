@@ -92,15 +92,33 @@ flowchart TD
     style BRF fill:#eefcf0,stroke:#86d99a
 ```
 
-> GitHub renderiza el bloque `mermaid` de arriba de forma interactiva. También hay
-> un `graph.png` (mismo diagrama) por si lo prefieres como imagen: se genera con
-> `python show_graph.py`.
->
-> El diagrama muestra solo el **camino principal** (la espina vertical). Los bucles
-> de **re-búsqueda** —cuando en una revisión pides datos nuevos y el grafo vuelve a
-> `research`/`tech_stack` y luego regresa a esa misma fase— se omiten a propósito
-> porque son aristas que suben de rango y descuadrarían el layout. Sí se ven los
-> bucles de **edición** (la flecha `editar` dentro de Preguntas y de briefing).
+El diagrama de arriba muestra el **camino principal** (la espina vertical) y, dentro
+de cada caja, sus detalles: el map-reduce de búsqueda y el bucle interno de
+**edición** (`editar`).
+
+Aparte, los **bucles de feedback** que ocurren cuando NO respondes `ok` en una
+revisión van en este segundo diagrama (se separan porque, dibujados sobre la espina
+vertical, descuadran el layout):
+
+```mermaid
+flowchart LR
+    rev{{"Revisión<br/>(preguntas o briefing)<br/>interrupt() · pausa"}}:::rev
+    gen["Generar de nuevo<br/>la MISMA fase"]
+    search["research / tech_stack<br/>(volver a BUSCAR datos)"]:::map
+
+    rev -. "editar<br/>(retoque de redacción)" .-> gen
+    rev -. "re-buscar<br/>(pides datos nuevos)" .-> search
+    search -. "vuelve a la fase<br/>que pidió la búsqueda" .-> gen
+    gen -- "muestra el<br/>resultado nuevo" --> rev
+
+    classDef rev fill:#ede7ff,stroke:#7c5cff,color:#111;
+    classDef map fill:#ffe9c7,stroke:#f0a23b,color:#111;
+    classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;
+```
+
+> GitHub renderiza los bloques `mermaid` de forma interactiva. También se generan
+> `graph.png` (camino principal) y `graph-loops.png` (bucles de feedback) con
+> `python show_graph.py`, por si los prefieres como imagen.
 
 ### Cómo funciona por dentro (resumen sencillo)
 
@@ -264,7 +282,8 @@ con la extensión *Markdown Preview Mermaid Support*).
 ├── inspect_run.py       # ejecuta con stream(subgraphs=True) para ver sub-grafos y map-reduce
 ├── requirements.txt     # dependencias
 ├── .env.example         # plantilla de variables de entorno
-├── graph.png            # diagrama del grafo
+├── graph.png            # diagrama: camino principal (espina vertical)
+├── graph-loops.png      # diagrama: bucles de feedback (editar / re-buscar)
 └── briefings/           # salida: los .md generados (ignorada por git)
 ```
 

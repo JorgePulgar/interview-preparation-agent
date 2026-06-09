@@ -66,9 +66,6 @@ MERMAID = """flowchart TD
     DONE([END]):::se
 
     %% --- Espina dorsal vertical (caja debajo de caja) ---
-    %% Nota: los bucles de "re-buscar" (volver a research/tech_stack desde la
-    %% revisión) NO se dibujan a propósito: como son aristas que suben de rango y
-    %% crean ciclos, descuadran el layout vertical. Se explican en el README.
     START --> RES
     START --> TEC
     RES --> QST
@@ -76,6 +73,12 @@ MERMAID = """flowchart TD
     QST -- "ok" --> BRF
     BRF -- "ok" --> write
     write --> DONE
+
+    %% Nota: los bucles de feedback (editar / re-buscar) NO se dibujan aquí.
+    %% Son aristas que suben de rango y crean ciclos; mezclados con esta espina
+    %% vertical, el motor de layout (dagre) descuadra todas las cajas. Por eso van
+    %% en un SEGUNDO diagrama (graph-loops). El de edición interno (editar) sí cabe
+    %% porque es local a cada caja.
 
     classDef se fill:#bfb6fc,stroke:#6c5ce7,color:#111,font-weight:bold;
     classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;
@@ -86,15 +89,39 @@ MERMAID = """flowchart TD
     style BRF fill:#eefcf0,stroke:#86d99a
 """
 
-with open("graph.mmd", "w", encoding="utf-8") as f:
-    f.write(MERMAID)
-print("Guardado: graph.mmd")
+# Segundo diagrama: SOLO los bucles de feedback (qué pasa cuando NO respondes "ok"
+# en una revisión). Va aparte porque estos bucles, dibujados sobre la espina
+# vertical de arriba, rompen el layout. Aquí, aislados y en horizontal, se leen bien.
+MERMAID_LOOPS = """flowchart LR
+    rev{{"Revisión<br/>(preguntas o briefing)<br/>interrupt() · pausa"}}:::rev
+    gen["Generar de nuevo<br/>la MISMA fase"]
+    search["research / tech_stack<br/>(volver a BUSCAR datos)"]:::map
 
-try:
-    png = draw_mermaid_png(MERMAID, max_retries=5, retry_delay=2.0)
-    with open("graph.png", "wb") as f:
-        f.write(png)
-    print("Guardado: graph.png  (ábrelo en VSCode)")
-except Exception as e:
-    print(f"\nNo se pudo generar el PNG ({type(e).__name__}): {e}")
-    print("Aun así tienes graph.mmd para previsualizar en VSCode.")
+    rev -. "editar<br/>(retoque de redacción)" .-> gen
+    rev -. "re-buscar<br/>(pides datos nuevos)" .-> search
+    search -. "vuelve a la fase<br/>que pidió la búsqueda" .-> gen
+    gen -- "muestra el<br/>resultado nuevo" --> rev
+
+    classDef rev fill:#ede7ff,stroke:#7c5cff,color:#111;
+    classDef map fill:#ffe9c7,stroke:#f0a23b,color:#111;
+    classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;
+"""
+
+
+def _render(mermaid: str, stem: str):
+    """Escribe <stem>.mmd y, si hay internet, <stem>.png."""
+    with open(f"{stem}.mmd", "w", encoding="utf-8") as f:
+        f.write(mermaid)
+    print(f"Guardado: {stem}.mmd")
+    try:
+        png = draw_mermaid_png(mermaid, max_retries=5, retry_delay=2.0)
+        with open(f"{stem}.png", "wb") as f:
+            f.write(png)
+        print(f"Guardado: {stem}.png  (ábrelo en VSCode)")
+    except Exception as e:
+        print(f"\nNo se pudo generar {stem}.png ({type(e).__name__}): {e}")
+        print(f"Aun así tienes {stem}.mmd para previsualizar en VSCode.")
+
+
+_render(MERMAID, "graph")              # camino principal (espina vertical)
+_render(MERMAID_LOOPS, "graph-loops")  # bucles de feedback (editar / re-buscar)
