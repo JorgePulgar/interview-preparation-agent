@@ -66,6 +66,9 @@ MERMAID = """flowchart TD
     DONE([END]):::se
 
     %% --- Espina dorsal vertical (caja debajo de caja) ---
+    %% Nota: los bucles de "re-buscar" (volver a research/tech_stack desde la
+    %% revisión) NO se dibujan a propósito: como son aristas que suben de rango y
+    %% crean ciclos, descuadran el layout vertical. Se explican en el README.
     START --> RES
     START --> TEC
     RES --> QST
@@ -73,14 +76,6 @@ MERMAID = """flowchart TD
     QST -- "ok" --> BRF
     BRF -- "ok" --> write
     write --> DONE
-
-    %% --- Re-búsqueda (feedback que necesita datos nuevos) ---
-    QST -. "re-buscar" .-> RES
-    QST -. "re-buscar" .-> TEC
-    BRF -. "re-buscar" .-> RES
-    BRF -. "re-buscar" .-> TEC
-    RES -. "vuelve tras re-buscar" .-> BRF
-    TEC -. "vuelve tras re-buscar" .-> BRF
 
     classDef se fill:#bfb6fc,stroke:#6c5ce7,color:#111,font-weight:bold;
     classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;

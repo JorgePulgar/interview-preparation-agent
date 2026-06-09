@@ -83,13 +83,6 @@ flowchart TD
     BRF -- "ok" --> write
     write --> DONE
 
-    QST -. "re-buscar" .-> RES
-    QST -. "re-buscar" .-> TEC
-    BRF -. "re-buscar" .-> RES
-    BRF -. "re-buscar" .-> TEC
-    RES -. "vuelve tras re-buscar" .-> BRF
-    TEC -. "vuelve tras re-buscar" .-> BRF
-
     classDef se fill:#bfb6fc,stroke:#6c5ce7,color:#111,font-weight:bold;
     classDef default fill:#f2f0ff,stroke:#b9aef7,color:#111;
     classDef map fill:#ffe9c7,stroke:#f0a23b,color:#111;
@@ -102,6 +95,12 @@ flowchart TD
 > GitHub renderiza el bloque `mermaid` de arriba de forma interactiva. También hay
 > un `graph.png` (mismo diagrama) por si lo prefieres como imagen: se genera con
 > `python show_graph.py`.
+>
+> El diagrama muestra solo el **camino principal** (la espina vertical). Los bucles
+> de **re-búsqueda** —cuando en una revisión pides datos nuevos y el grafo vuelve a
+> `research`/`tech_stack` y luego regresa a esa misma fase— se omiten a propósito
+> porque son aristas que suben de rango y descuadrarían el layout. Sí se ven los
+> bucles de **edición** (la flecha `editar` dentro de Preguntas y de briefing).
 
 ### Cómo funciona por dentro (resumen sencillo)
 
