@@ -16,8 +16,8 @@ una persona revise el resultado y diga "ok" o pida cambios.
 Flujo general (las flechas son los 'edges' del grafo):
 
   START
-    ├─→ research_node ───┐   (estos dos corren EN PARALELO)
-    └─→ tech_stack_node ─┤
+    ├─→ [research] ──────┐   (estos dos SUB-GRAFOS corren EN PARALELO)
+    └─→ [tech_stack] ────┤
                          ▼
             generate_questions_node ──→ review_questions_node
                   ↑                         │  interrupt(): 'ok' / feedback
@@ -25,20 +25,18 @@ Flujo general (las flechas son los 'edges' del grafo):
                   └─────────────────────────┤
                   ┌──── feedback de datos ───┤   (re-buscar research/tech_stack
                   │                          │    y volver aquí)
-            research_node / tech_stack_node ◄┘
+                [research] / [tech_stack]  ◄─┘
                          │ ok
                          ▼
-            generate_briefing_node ──→ review_briefing_node
-                  ↑                         │  interrupt(): 'ok' / feedback
-                  └──── edición ────────────┤
+                    [briefing]  (SUB-GRAFO: genera + revisa con interrupt)
+                  ↑      │
+                  │      │ ok ─────────────→ write_file_node ──→ END
+                  └──────┤
                   ┌──── feedback de datos ───┤   (re-buscar y volver al briefing)
-            research_node / tech_stack_node ◄┘
-                         │ ok
-                         ▼
-                  write_file_node ──→ END
+                [research] / [tech_stack]  ◄─┘
 
 ------------------------------------------------------------------------------
-DOS IDEAS CLAVE DEL DISEÑO (importante entenderlas)
+CUATRO IDEAS CLAVE DEL DISEÑO (importante entenderlas)
 ------------------------------------------------------------------------------
   1) Generación y revisión SEPARADAS en nodos distintos.
      En LangGraph, cuando el grafo se reanuda tras un interrupt() (la pausa),
@@ -57,6 +55,32 @@ DOS IDEAS CLAVE DEL DISEÑO (importante entenderlas)
      Los nodos de búsqueda guardan en el estado un 'search_return' para saber a
      qué fase regresar después de buscar (a las preguntas o al briefing).
 
+  3) SUB-GRAFOS (subgraphs).
+     Un sub-grafo es un grafo completo que se USA COMO SI FUERA UN NODO dentro
+     de otro grafo. Aquí 'research', 'tech_stack' y 'briefing' son sub-grafos
+     compilados. El grafo padre los invoca como nodos normales; por dentro, cada
+     uno tiene sus propios nodos y flechas. Ventaja: encapsula una fase entera
+     (sus pasos internos no ensucian el grafo principal) y se puede razonar/
+     probar por separado.
+     · Comunicación padre↔hijo: por NOMBRE DE CLAVE. Las claves del estado que
+       existen en AMBOS (p.ej. 'company', 'research', 'briefing') se pasan al
+       entrar y se devuelven al salir. Las claves que SOLO existen en el hijo
+       (p.ej. 'search_results') son internas y no se ven desde fuera.
+     · Checkpointer e interrupt(): el sub-grafo se compila SIN checkpointer; hereda
+       el del padre. Por eso un interrupt() dentro del sub-grafo 'briefing' burbujea
+       hasta el invoke() de arriba y se puede reanudar con Command(resume=...).
+
+  4) MAP-REDUCE con Send (búsqueda en paralelo dentro de cada sub-grafo).
+     Los sub-grafos de búsqueda no lanzan sus queries una tras otra. Usan el
+     patrón map-reduce de LangGraph:
+       - MAP   : una función de "fan-out" devuelve una lista de Send(...), uno por
+                 query. LangGraph crea N copias del nodo trabajador 'search_one'
+                 y las ejecuta EN PARALELO, cada una con su query.
+       - REDUCE: cada trabajador escribe su resultado en un canal de tipo lista con
+                 un REDUCER (Annotated[list, operator.add]) que CONCATENA en vez de
+                 sobrescribir. Cuando todos terminan (fan-in), un único nodo
+                 'synthesize' lee la lista completa y la resume con el LLM.
+
 ------------------------------------------------------------------------------
 REQUISITOS
 ------------------------------------------------------------------------------
@@ -71,11 +95,14 @@ en un archivo .env:
 # --- Librerías estándar de Python ---------------------------------------------
 import os         # acceso a variables de entorno y rutas de archivos
 import re         # expresiones regulares (para limpiar el nombre del archivo)
+import operator   # operator.add: lo usamos como REDUCER para concatenar listas
 import datetime   # fecha/hora (para el nombre del archivo y la cabecera del .md)
 
 # 'TypedDict' nos deja describir la forma del estado (qué claves tiene y de qué
-# tipo). 'Optional[str]' significa "puede ser un str o None".
-from typing import TypedDict, Optional
+# tipo). 'Optional[str]' significa "puede ser un str o None". 'Annotated' nos deja
+# "etiquetar" un tipo con metadatos; LangGraph usa esa etiqueta para saber qué
+# REDUCER aplicar cuando varios nodos escriben en la misma clave a la vez.
+from typing import TypedDict, Optional, Annotated
 
 # python-dotenv: carga el archivo .env y vuelca sus valores en las variables de
 # entorno del proceso (os.environ).
@@ -99,7 +126,9 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 # interrupt: pausa el grafo y devuelve el control a quien lo invocó.
 # Command: objeto que usamos para REANUDAR el grafo pasándole la respuesta humana.
-from langgraph.types import interrupt, Command
+# Send: el "sobre" del map-reduce. Send("nodo", payload) le dice a LangGraph
+#       "crea una copia del nodo 'nodo' y ejecútala con este payload como estado".
+from langgraph.types import interrupt, Command, Send
 
 
 # ---------------------------------------------------------------------------
@@ -113,8 +142,8 @@ from langgraph.types import interrupt, Command
 
 class InterviewState(TypedDict):
     company: str                        # nombre de la empresa (lo da el usuario al arrancar)
-    research: str                       # texto resumen que produce research_node
-    tech_stack: str                     # texto del stack que produce tech_stack_node
+    research: str                       # texto resumen que produce el sub-grafo 'research'
+    tech_stack: str                     # texto del stack que produce el sub-grafo 'tech_stack'
 
     smart_questions: Optional[str]      # las 3 preguntas (candidatas o ya aprobadas)
     previous_questions: Optional[str]   # preguntas que se le mostraron al humano; base para editar
@@ -246,79 +275,163 @@ def _classify_feedback(feedback: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 3. Nodos de investigación (búsqueda web). Pueden re-ejecutarse bajo demanda.
+# 3. Sub-grafos de búsqueda (research y tech_stack) con MAP-REDUCE
 # ---------------------------------------------------------------------------
-# Un "nodo" es una función normal: recibe el estado y devuelve un dict con los
-# campos a actualizar. Estos dos nodos son los únicos que tocan internet.
+# Los dos sub-grafos comparten la MISMA estructura interna:
+#
+#     START ──(fan-out: un Send por query)──► search_one ─┐
+#                                             search_one ─┤─► synthesize ─► END
+#                                             search_one ─┘
+#                                            (en PARALELO)   (fan-in)
+#
+# El nodo trabajador 'search_one' es COMÚN a ambos sub-grafos (misma función).
+# Lo que cambia es: (a) qué queries genera el fan-out, y (b) qué hace el
+# 'synthesize' final (resumir noticias vs. extraer el stack).
 
-def research_node(state: InterviewState) -> dict:
-    """Busca información general y noticias recientes de la empresa y la resume."""
+# --- Estados internos de los sub-grafos ---
+# 'search_results' es la clave clave del map-reduce: Annotated[list[str], operator.add]
+# significa "es una lista de str y, cuando varios nodos escriban en ella a la vez,
+# CONCATÉNALAS (no las sobrescribas)". Sin este reducer, los Send paralelos darían
+# error por escribir todos en la misma clave.
+# 'search_results' SOLO existe aquí (no en InterviewState) -> es interno al sub-grafo.
+
+class ResearchState(TypedDict):
+    company: str                                  # entra desde el padre
+    search_feedback: Optional[str]                # entra desde el padre (afina la query)
+    search_results: Annotated[list[str], operator.add]   # acumulador interno (map-reduce)
+    research: str                                 # sale hacia el padre
+
+
+class TechStackState(TypedDict):
+    company: str
+    search_feedback: Optional[str]
+    search_results: Annotated[list[str], operator.add]
+    tech_stack: str                               # sale hacia el padre
+
+
+# Esquemas de SALIDA de los sub-grafos de búsqueda. CLAVE para el paralelismo:
+# 'research' y 'tech_stack' corren en el MISMO superstep (fan-out desde START). Si
+# cada sub-grafo devolviera al padre TODAS sus claves compartidas (company,
+# search_feedback...), habría DOS escrituras de 'company' en el mismo paso y
+# LangGraph fallaría con InvalidUpdateError (un canal LastValue admite 1 valor/paso).
+# Limitando la salida a SOLO el resultado, cada sub-grafo escribe una clave distinta
+# y no chocan. Los datos de ENTRADA (company, search_feedback) siguen llegando porque
+# el esquema de entrada es el estado completo; solo filtramos lo que SALE.
+class ResearchOut(TypedDict):
+    research: str
+
+
+class TechStackOut(TypedDict):
+    tech_stack: str
+
+
+def search_one(payload: dict) -> dict:
+    """Nodo TRABAJADOR del map-reduce (común a ambos sub-grafos).
+
+    Recibe como estado EXACTAMENTE el payload que le pasó su Send (aquí: {"query": ...}),
+    no el estado completo del sub-grafo. Hace UNA búsqueda y devuelve sus textos.
+    Como devolvemos la clave 'search_results' (que tiene reducer operator.add), el
+    resultado se CONCATENA con el de los demás trabajadores en vez de pisarlo.
+    """
+    return {"search_results": _tavily_contents(payload["query"])}
+
+
+def fan_out_research(state: ResearchState) -> list[Send]:
+    """MAP del sub-grafo 'research': construye las queries y lanza un Send por cada una.
+
+    Devolver una lista de Send hace que LangGraph cree N copias paralelas de
+    'search_one'. Esta función NO modifica el estado; solo decide el trabajo a repartir.
+    """
     company = state["company"]
-    # search_feedback solo tiene valor cuando venimos de un "re-buscar"; en la
-    # primera ejecución es None -> extra = "".
+    # search_feedback solo trae valor cuando venimos de un "re-buscar"; si no, "".
     extra = state.get("search_feedback") or ""
     if extra:
-        # Mensaje en consola para que se VEA que de verdad estamos buscando otra vez.
         print(f"  [re-buscando información general — '{extra}']")
 
-    # Construimos la consulta. .strip() elimina espacios sobrantes si extra="".
-    query = f"{company} company overview recent news 2025 {extra}".strip()
-    # Unimos el texto de todos los resultados en un solo bloque.
-    content = "\n".join(_tavily_contents(query))
+    # Tres ángulos distintos para cubrir "qué hacen" + "noticias" + "producto/negocio".
+    queries = [
+        f"{company} company overview what they do {extra}".strip(),
+        f"{company} recent news 2025 {extra}".strip(),
+        f"{company} products business model funding {extra}".strip(),
+    ]
+    return [Send("search_one", {"query": q}) for q in queries]
 
-    # Le pedimos al LLM un resumen corto y concreto a partir de lo encontrado.
+
+def synthesize_research(state: ResearchState) -> dict:
+    """REDUCE del sub-grafo 'research': junta todo lo buscado y lo resume con el LLM.
+
+    Se ejecuta UNA sola vez, cuando TODOS los 'search_one' han terminado (fan-in).
+    Lee 'search_results' (ya concatenado por el reducer) y 'company'.
+    """
+    content = "\n".join(state["search_results"])
     summary = llm.invoke(
-        f"Resume en 150 palabras qué hace '{company}' y sus noticias más relevantes "
-        f"del último año. Sé concreto, sin frases genéricas.\n\n{content}"
+        f"Resume en 150 palabras qué hace '{state['company']}' y sus noticias más "
+        f"relevantes del último año. Sé concreto, sin frases genéricas.\n\n{content}"
     )
-    # Devolvemos SOLO el campo que cambia. .content es el texto de la respuesta.
+    # Devolvemos SOLO la clave que cruza al padre. .content es el texto de la respuesta.
     return {"research": summary.content}
 
 
-def tech_stack_node(state: InterviewState) -> dict:
-    """Busca el stack tecnológico real de la empresa usando tres señales:
-    1. Su blog de ingeniería (engineering blog).
-    2. Ofertas de empleo (suelen listar tecnologías sin querer).
-    3. StackShare (catálogo de stacks de empresas).
+def fan_out_tech(state: TechStackState) -> list[Send]:
+    """MAP del sub-grafo 'tech_stack': tres señales para inferir el stack real.
+    1. Blog de ingeniería.  2. Ofertas de empleo.  3. StackShare.
     """
     company = state["company"]
     extra = state.get("search_feedback") or ""
     if extra:
         print(f"  [re-buscando stack tecnológico — '{extra}']")
 
-    # Tres queries distintas para cubrir las tres señales mencionadas arriba.
     queries = [
         f"{company} engineering blog tech stack architecture {extra}".strip(),
         f"{company} jobs software engineer requirements technologies {extra}".strip(),
         f"{company} site:stackshare.io OR {company} stackshare technologies",
     ]
+    return [Send("search_one", {"query": q}) for q in queries]
 
-    # Lanzamos las 3 búsquedas y juntamos todos los textos.
-    all_content = []
-    for q in queries:
-        all_content.extend(_tavily_contents(q))  # extend = añadir todos los elementos
 
-    combined = "\n\n".join(all_content)
-
-    # Pedimos al LLM que EXTRAIGA el stack, insistiendo en que no invente.
+def synthesize_tech(state: TechStackState) -> dict:
+    """REDUCE del sub-grafo 'tech_stack': extrae el stack CONCRETO de lo buscado."""
+    combined = "\n\n".join(state["search_results"])
     stack = llm.invoke(
-        f"Extrae el stack tecnológico CONCRETO de '{company}' a partir de esta información. "
-        f"Lista: lenguajes, frameworks, cloud, bases de datos, CI/CD, herramientas de observabilidad. "
-        f"Si no encuentras algo concreto, di explícitamente qué sección está vacía. "
-        f"No inventes nada.\n\n{combined}"
+        f"Extrae el stack tecnológico CONCRETO de '{state['company']}' a partir de esta "
+        f"información. Lista: lenguajes, frameworks, cloud, bases de datos, CI/CD, "
+        f"herramientas de observabilidad. Si no encuentras algo concreto, di "
+        f"explícitamente qué sección está vacía. No inventes nada.\n\n{combined}"
     )
     return {"tech_stack": stack.content}
 
 
+def _build_search_subgraph(state_schema, output_schema, fan_out, synthesize):
+    """Fábrica que monta y COMPILA un sub-grafo de búsqueda map-reduce.
+
+    Recibe el esquema de estado, el esquema de SALIDA (qué claves devuelve al padre),
+    la función de fan-out (MAP) y la de síntesis (REDUCE), y devuelve el grafo ya
+    compilado, listo para usarse como un nodo.
+    Lo compilamos SIN checkpointer a propósito: heredará el del grafo padre.
+    """
+    b = StateGraph(state_schema, output_schema=output_schema)
+    b.add_node("search_one", search_one)
+    b.add_node("synthesize", synthesize)
+    # add_conditional_edges desde START con una función que devuelve Sends = fan-out (MAP).
+    # El tercer argumento (["search_one"]) declara a qué nodo(s) pueden ir esos Send.
+    b.add_conditional_edges(START, fan_out, ["search_one"])
+    # Cuando TODOS los 'search_one' terminan, se sigue UNA vez a 'synthesize' (fan-in / REDUCE).
+    b.add_edge("search_one", "synthesize")
+    b.add_edge("synthesize", END)
+    return b.compile()
+
+
+# Compilamos los dos sub-grafos de búsqueda.
+research_subgraph = _build_search_subgraph(ResearchState, ResearchOut, fan_out_research, synthesize_research)
+tech_stack_subgraph = _build_search_subgraph(TechStackState, TechStackOut, fan_out_tech, synthesize_tech)
+
+
 def route_after_search(state: InterviewState) -> str:
-    """Función de enrutado: decide a qué nodo ir DESPUÉS de buscar.
+    """Función de enrutado (en el grafo PADRE): decide a qué fase ir DESPUÉS de buscar.
 
     Las funciones de enrutado NO modifican el estado; solo LEEN el estado y
-    devuelven el NOMBRE (string) del siguiente nodo. LangGraph usa ese nombre
-    para elegir la flecha a seguir (ver add_conditional_edges más abajo).
-
-    Aquí volvemos a la fase que pidió la búsqueda. Si por lo que sea no hay
-    'search_return', por defecto vamos a generar preguntas (el flujo inicial).
+    devuelven el NOMBRE (string) del siguiente nodo. Aquí volvemos a la fase que
+    pidió la búsqueda. Si no hay 'search_return', por defecto vamos a las preguntas.
     """
     return state.get("search_return") or "generate_questions_node"
 
@@ -404,7 +517,7 @@ Formato de respuesta:
 
     # Guardamos las preguntas. Limpiamos los feedbacks ya consumidos:
     # - questions_feedback: ya lo aplicamos.
-    # - search_feedback: ya lo usó el nodo de búsqueda (si veníamos de re-buscar).
+    # - search_feedback: ya lo usó el sub-grafo de búsqueda (si veníamos de re-buscar).
     return {"smart_questions": candidate, "questions_feedback": None, "search_feedback": None}
 
 
@@ -428,9 +541,9 @@ def review_questions_node(state: InterviewState) -> dict:
 
     fb = str(human_feedback).strip()  # normalizamos la respuesta (quita espacios)
 
-    # CASO 1: el humano aprueba -> seguimos hacia el briefing.
+    # CASO 1: el humano aprueba -> seguimos hacia el sub-grafo de briefing.
     if fb.lower() == "ok":
-        return {"route": "generate_briefing_node", "questions_feedback": None,
+        return {"route": "briefing", "questions_feedback": None,
                 "previous_questions": None}
 
     # Si NO es "ok", clasificamos qué tipo de petición es.
@@ -446,11 +559,11 @@ def review_questions_node(state: InterviewState) -> dict:
             "questions_feedback": fb,
         }
 
-    # CASO 3: pide datos nuevos (research o tech_stack) -> vamos a re-buscar y
-    # luego volvemos a generar las preguntas. f"{intent}_node" produce
-    # "research_node" o "tech_stack_node".
+    # CASO 3: pide datos nuevos (research o tech_stack) -> vamos al sub-grafo de
+    # búsqueda y luego volvemos a generar las preguntas. 'intent' ya es exactamente
+    # el nombre del nodo de sub-grafo: "research" o "tech_stack".
     return {
-        "route": f"{intent}_node",
+        "route": intent,
         "smart_questions": None,
         "previous_questions": None,        # se regeneran desde cero con los datos nuevos
         "questions_feedback": fb,          # se usa como nota orientativa
@@ -466,11 +579,38 @@ def route_after_questions_review(state: InterviewState) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 5. Briefing: generación (LLM) + revisión (interrupt) en nodos separados
+# 5. Briefing: SUB-GRAFO con generación (LLM) + revisión (interrupt)
 # ---------------------------------------------------------------------------
-# Misma estructura que las preguntas: un nodo genera, otro revisa.
+# El briefing es un sub-grafo que encapsula el ciclo "redacta + aprueba":
+#
+#     START ─► generate_briefing ─► review_briefing ──(edición)──┐
+#                  ▲                      │                       │
+#                  └──────────────────────┘  (bucle interno)      │
+#                                         │ ok / re-buscar        │
+#                                         ▼                       │
+#                                        END  (sale al padre con  │
+#                                              'route' decidido)  │
+#
+# El bucle de EDICIÓN es interno (no sale del sub-grafo). En cambio "ok" y
+# "re-buscar" SALEN al padre: dejan la decisión en state['route'] y el grafo padre
+# la usa para ir a write_file_node o a los sub-grafos de búsqueda.
 
-def _full_briefing_prompt(state: InterviewState) -> str:
+class BriefingState(TypedDict):
+    company: str                        # entra desde el padre
+    research: str                       # entra desde el padre
+    tech_stack: str                     # entra desde el padre
+    smart_questions: Optional[str]      # entra desde el padre
+
+    briefing: Optional[str]             # candidato o aprobado (cruza al padre)
+    previous_briefing: Optional[str]    # base para la edición dirigida
+    briefing_feedback: Optional[str]    # el cambio pedido sobre el briefing
+
+    route: Optional[str]                # decisión que leerá el padre al salir
+    search_return: Optional[str]        # a dónde volver tras re-buscar (cruza al padre)
+    search_feedback: Optional[str]      # afina la query si se re-busca (cruza al padre)
+
+
+def _full_briefing_prompt(state: BriefingState) -> str:
     """Construye el prompt para montar el briefing COMPLETO desde cero.
     Lo separamos en una función porque se usa en el primer montaje y también
     después de re-buscar datos."""
@@ -503,7 +643,7 @@ PREGUNTAS: {state['smart_questions']}
 """
 
 
-def generate_briefing_node(state: InterviewState) -> dict:
+def generate_briefing_node(state: BriefingState) -> dict:
     """Genera (o edita) el briefing. NO contiene interrupt() (mismo motivo que en
     las preguntas). Si hay feedback + briefing previo -> edición dirigida; si no,
     monta el briefing entero (también tras re-buscar datos)."""
@@ -533,9 +673,12 @@ Devuelve el briefing COMPLETO en Markdown aplicando EXCLUSIVAMENTE ese cambio:
     return {"briefing": briefing_text, "briefing_feedback": None, "search_feedback": None}
 
 
-def review_briefing_node(state: InterviewState) -> dict:
-    """Nodo de REVISIÓN del briefing. Aquí está el segundo interrupt().
-    'ok' finaliza (vamos a guardar el archivo); si no, clasificamos y enrutamos."""
+def review_briefing_node(state: BriefingState) -> dict:
+    """Nodo de REVISIÓN del briefing (dentro del sub-grafo). Aquí está el segundo
+    interrupt(); como el sub-grafo hereda el checkpointer del padre, la pausa
+    burbujea hasta el invoke() de arriba igual que la de las preguntas.
+    'ok' -> salir al padre para guardar; 'editar' -> bucle interno; 'datos' -> salir
+    al padre a re-buscar."""
     human_feedback = interrupt({
         "mensaje": (
             "Briefing final generado. Responde 'ok' para guardarlo en un .md, "
@@ -546,35 +689,62 @@ def review_briefing_node(state: InterviewState) -> dict:
 
     fb = str(human_feedback).strip()
 
-    # CASO 1: aprobado -> ir a escribir el archivo.
+    # CASO 1: aprobado -> el padre irá a escribir el archivo.
     if fb.lower() == "ok":
         return {"route": "write_file_node", "briefing_feedback": None,
                 "previous_briefing": None}
 
     intent = _classify_feedback(fb)
 
-    # CASO 2: edición de texto -> edición dirigida del briefing.
+    # CASO 2: edición de texto -> bucle INTERNO del sub-grafo (vuelve a generate_briefing).
+    # Marcamos route="generate_briefing"; el router interno lo interpreta como "no salgas".
     if intent == "edit":
         return {
-            "route": "generate_briefing_node",
+            "route": "generate_briefing",
             "briefing": None,
             "previous_briefing": state["briefing"],   # base EXACTA de la edición
             "briefing_feedback": fb,
         }
 
-    # CASO 3: datos nuevos -> re-buscar y volver a montar el briefing entero.
+    # CASO 3: datos nuevos -> SALIR al padre a re-buscar y luego volver al briefing.
+    # 'intent' es "research" o "tech_stack" (nombres de los sub-grafos del padre).
     return {
-        "route": f"{intent}_node",
+        "route": intent,
         "briefing": None,
         "previous_briefing": None,         # se reconstruye con los datos nuevos
         "briefing_feedback": None,
-        "search_return": "generate_briefing_node",  # tras buscar, volver al briefing
+        "search_return": "briefing",       # tras buscar, volver a ESTE sub-grafo
         "search_feedback": fb,             # afina la query de búsqueda
     }
 
 
-def route_after_briefing_review(state: InterviewState) -> str:
-    """Enrutado tras la revisión del briefing: devolvemos la decisión 'route'."""
+def route_inside_briefing(state: BriefingState) -> str:
+    """Router INTERNO del sub-grafo de briefing tras la revisión.
+    Solo la edición se queda dentro (bucle a generate_briefing); cualquier otra
+    decisión SALE del sub-grafo (END) y el padre lee state['route']."""
+    return "generate_briefing" if state["route"] == "generate_briefing" else END
+
+
+def _build_briefing_subgraph():
+    """Monta y compila el sub-grafo de briefing (genera + revisa con interrupt).
+    Sin checkpointer: hereda el del padre, necesario para que el interrupt() funcione."""
+    b = StateGraph(BriefingState)
+    b.add_node("generate_briefing", generate_briefing_node)
+    b.add_node("review_briefing", review_briefing_node)
+    b.add_edge(START, "generate_briefing")
+    b.add_edge("generate_briefing", "review_briefing")
+    # Tras revisar: o bucle interno de edición, o salida (END) con la decisión en 'route'.
+    b.add_conditional_edges("review_briefing", route_inside_briefing,
+                            {"generate_briefing": "generate_briefing", END: END})
+    return b.compile()
+
+
+briefing_subgraph = _build_briefing_subgraph()
+
+
+def route_after_briefing(state: InterviewState) -> str:
+    """Enrutado en el PADRE tras el sub-grafo de briefing: devolvemos la decisión
+    'route' que dejó review_briefing al salir ('write_file_node', 'research' o 'tech_stack')."""
     return state["route"]
 
 
@@ -610,40 +780,38 @@ def write_file_node(state: InterviewState) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 7. Construcción del grafo
+# 7. Construcción del grafo PADRE
 # ---------------------------------------------------------------------------
-# Aquí "cableamos" los nodos y las flechas. Hasta este punto solo definimos
-# funciones; ahora las conectamos en un grafo ejecutable.
+# Aquí "cableamos" los nodos y las flechas. Los sub-grafos compilados
+# (research_subgraph, tech_stack_subgraph, briefing_subgraph) se añaden como
+# nodos NORMALES: el padre no necesita saber qué hacen por dentro.
 
 # StateGraph recibe la forma del estado para saber qué claves existen.
 builder = StateGraph(InterviewState)
 
-# Registramos cada nodo con un NOMBRE (string) y la FUNCIÓN que lo implementa.
-# Esos nombres son los que usan las flechas y las funciones de enrutado.
-builder.add_node("research_node", research_node)
-builder.add_node("tech_stack_node", tech_stack_node)
+# Registramos cada nodo con un NOMBRE (string). Los tres primeros son SUB-GRAFOS.
+builder.add_node("research", research_subgraph)                    # sub-grafo map-reduce
+builder.add_node("tech_stack", tech_stack_subgraph)               # sub-grafo map-reduce
 builder.add_node("generate_questions_node", generate_questions_node)
 builder.add_node("review_questions_node", review_questions_node)
-builder.add_node("generate_briefing_node", generate_briefing_node)
-builder.add_node("review_briefing_node", review_briefing_node)
+builder.add_node("briefing", briefing_subgraph)                   # sub-grafo (genera + revisa)
 builder.add_node("write_file_node", write_file_node)
 
 # --- Flechas (edges) ---
 
-# Desde START salen DOS flechas a la vez -> research y tech_stack corren EN
-# PARALELO (fan-out). Ambos terminan y luego se sigue hacia preguntas (fan-in).
-builder.add_edge(START, "research_node")
-builder.add_edge(START, "tech_stack_node")
+# Desde START salen DOS flechas a la vez -> los sub-grafos 'research' y 'tech_stack'
+# corren EN PARALELO (fan-out). Ambos terminan y luego se sigue a preguntas (fan-in).
+builder.add_edge(START, "research")
+builder.add_edge(START, "tech_stack")
 
-# Flechas CONDICIONALES tras buscar: el destino depende de una función de
-# enrutado (route_after_search) que devuelve un nombre de nodo. El diccionario
-# mapea ese nombre -> nodo destino real (aquí coinciden).
+# Flechas CONDICIONALES tras buscar: el destino depende de route_after_search, que
+# devuelve a qué fase volver. El diccionario mapea ese nombre -> nodo destino real.
 _search_targets = {
     "generate_questions_node": "generate_questions_node",
-    "generate_briefing_node": "generate_briefing_node",
+    "briefing": "briefing",
 }
-builder.add_conditional_edges("research_node", route_after_search, _search_targets)
-builder.add_conditional_edges("tech_stack_node", route_after_search, _search_targets)
+builder.add_conditional_edges("research", route_after_search, _search_targets)
+builder.add_conditional_edges("tech_stack", route_after_search, _search_targets)
 
 # Generar preguntas -> revisar preguntas (flecha simple, siempre va aquí).
 builder.add_edge("generate_questions_node", "review_questions_node")
@@ -653,22 +821,20 @@ builder.add_conditional_edges(
     route_after_questions_review,
     {
         "generate_questions_node": "generate_questions_node",  # retoque de redacción
-        "research_node": "research_node",                      # re-buscar datos generales
-        "tech_stack_node": "tech_stack_node",                  # re-buscar stack
-        "generate_briefing_node": "generate_briefing_node",    # aprobado -> al briefing
+        "research": "research",                                # re-buscar datos generales
+        "tech_stack": "tech_stack",                            # re-buscar stack
+        "briefing": "briefing",                                # aprobado -> al briefing
     },
 )
 
-# Generar briefing -> revisar briefing.
-builder.add_edge("generate_briefing_node", "review_briefing_node")
-# Tras revisar briefing, el destino depende de la decisión 'route':
+# Tras el sub-grafo de briefing, el destino depende de la decisión 'route' que dejó
+# al salir (la edición ya se resolvió DENTRO del sub-grafo, no llega aquí):
 builder.add_conditional_edges(
-    "review_briefing_node",
-    route_after_briefing_review,
+    "briefing",
+    route_after_briefing,
     {
-        "generate_briefing_node": "generate_briefing_node",    # retoque de redacción
-        "research_node": "research_node",                      # re-buscar datos generales
-        "tech_stack_node": "tech_stack_node",                  # re-buscar stack
+        "research": "research",                                # re-buscar datos generales
+        "tech_stack": "tech_stack",                            # re-buscar stack
         "write_file_node": "write_file_node",                  # aprobado -> guardar
     },
 )
@@ -679,6 +845,8 @@ builder.add_edge("write_file_node", END)
 # El checkpointer guarda el estado entre pausas. Sin esto, interrupt() no podría
 # reanudar donde lo dejó. MemorySaver lo guarda en memoria (se pierde al cerrar
 # el programa; para algo persistente se usaría una base de datos).
+# NOTA: solo el grafo PADRE lleva checkpointer; los sub-grafos lo heredan, por eso
+# el interrupt() dentro del sub-grafo de briefing funciona igual que el de preguntas.
 memory = MemorySaver()
 
 # compile() convierte el "plano" (builder) en un grafo EJECUTABLE.
