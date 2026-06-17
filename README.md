@@ -6,7 +6,7 @@
 
 <p align="right"><sub><b>English</b> · <a href="./README.es.md">Español</a></sub></p>
 
-<h1 align="center">Interview Research Agent 🕵️</h1>
+<h1 align="center">Interview Research Agent</h1>
 
 <p align="center">
   <b>A LangGraph agent that researches a company before an interview and writes a Markdown briefing.</b><br>
